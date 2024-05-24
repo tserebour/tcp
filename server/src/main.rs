@@ -1,10 +1,38 @@
 use std::net::{TcpListener, TcpStream};
+use std::io::{Read, Write};
 
 use std::io::Result;
 
-fn handle_client(stream: TcpStream) {
+fn handle_client(mut stream: TcpStream) {
+    let mut buffer = [0; 1024];
 
-    println!("{}", stream.peer_addr().unwrap());
+    let read_buffer = stream.read(&mut buffer);
+
+    match read_buffer {
+        Ok(_) => {
+            let request = String::from_utf8_lossy(&buffer[..]);
+            println!("Read {} bytes", request);
+
+            let message_to_send = format!("HTTP/1.1 200 OK\r\n\r\nHello Client {}!", &stream.peer_addr().unwrap());
+
+            let response = message_to_send.as_bytes();
+            match stream.write(&response){
+                Ok(_) => {
+                    println!("Wrote {} bytes", response.len());
+                }
+                Err(e) => {
+                    eprintln!("Failed to write to client: {}", e);
+                }
+            };
+        }
+        Err(e) => {
+            eprintln!("Failed to read from client: {}", e);
+        }
+        
+    }
+
+    // println!("{}", stream.peer_addr().unwrap());
+    
     
 }
 
@@ -18,7 +46,7 @@ fn main() -> std::io::Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        handle_client(stream);
+                        std::thread::spawn(|| handle_client(stream));
                     }
                     Err(e) => {
                         eprintln!("Failed to accept connection: {}", e);
